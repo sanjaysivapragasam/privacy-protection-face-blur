@@ -24,6 +24,22 @@ try:  # Optional: users can comment this block if mtcnn is unavailable.
 except ImportError:  # pragma: no cover - mtcnn should be installed per requirements.
     MTCNN = None
 
+
+_mtcnn_detector: Optional["MTCNN"] = None
+
+
+def get_mtcnn_detector() -> "MTCNN":
+    """Instantiate the global MTCNN detector once and reuse it."""
+
+    global _mtcnn_detector
+    if MTCNN is None:
+        raise ImportError(
+            "MTCNN library is not installed. Install it via 'pip install mtcnn'."
+        )
+    if _mtcnn_detector is None:
+        _mtcnn_detector = MTCNN()
+    return _mtcnn_detector
+
 # ------------------------------------------------------------------------------------
 # Data containers and utility helpers
 # ------------------------------------------------------------------------------------
@@ -91,11 +107,7 @@ def detect_faces_haar(
 def detect_faces_mtcnn(image: np.ndarray) -> List[DetectionResult]:
     """Detect faces using the MTCNN deep learning detector."""
 
-    if MTCNN is None:
-        raise ImportError(
-            "MTCNN library is not installed. Install it via 'pip install mtcnn'."
-        )
-    detector = MTCNN()
+    detector = get_mtcnn_detector()
     detections = detector.detect_faces(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
     results: List[DetectionResult] = []
     for det in detections:
