@@ -29,6 +29,9 @@ DNN_PROTO_URLS: Sequence[str] = (
 )
 
 DNN_WEIGHTS_URLS: Sequence[str] = (
+    "https://github.com/opencv/opencv/raw/4.x/samples/dnn/face_detector/"
+    "res10_300x300_ssd_iter_140000_fp16.caffemodel",
+    "https://github.com/spmallick/learnopencv/raw/master/FaceDetectionComparison/models/"
     "https://raw.githubusercontent.com/opencv/opencv_3rdparty/dnn_samples_face_detector_20170830/"
     "res10_300x300_ssd_iter_140000_fp16.caffemodel",
     "https://raw.githubusercontent.com/opencv/opencv_3rdparty/master/dnn_samples/face_detector/"
@@ -102,11 +105,24 @@ def detect_faces_haar(
 _dnn_net: Optional[cv2.dnn_Net] = None
 
 
+def _normalize_urls(urls: Sequence[str]) -> List[str]:
+    """Flatten nested URL containers into a simple string list."""
+
+    flat: List[str] = []
+    for url in urls:
+        if isinstance(url, (list, tuple, set)):
+            flat.extend([str(u) for u in url])
+        else:
+            flat.append(str(url))
+    return flat
+
+
 def _download_file(urls: Sequence[str], destination: Path) -> None:
     """Download a file from one of the given URLs to the destination path."""
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     errors = []
+    for url in _normalize_urls(urls):
     for url in urls:
         try:
             print(f"[INFO] Downloading {destination.name} from {url}")
