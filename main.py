@@ -1,12 +1,7 @@
-"""Automatic Face Detection and Privacy Protection using Face Blurring.
-
-This script demonstrates how to detect faces with multiple detectors
-and apply privacy preserving transformations such as Gaussian blur or
-pixelation. It supports processing individual images, batches of images
-in a folder, and live or recorded video streams.
 """
-
-from __future__ import annotations
+Automatic Face Detection and Privacy Protection using Face Blurring
+Clean version – no downloads, uses local DNN model files.
+"""
 
 import argparse
 import sys
@@ -40,12 +35,19 @@ DNN_WEIGHTS_URLS: Sequence[str] = (
 # ------------------------------------------------------------------------------------
 # Data containers and utility helpers
 # ------------------------------------------------------------------------------------
+# -------------------------------------------------------------
+# Paths to your LOCAL MODEL FILES
+# -------------------------------------------------------------
+DEFAULT_MODELS_DIR = Path("models")
 
+DEFAULT_DNN_PROTO = DEFAULT_MODELS_DIR / "deploy.prototxt"
+DEFAULT_DNN_WEIGHTS = DEFAULT_MODELS_DIR / "res10_300x300_ssd_iter_140000_fp16.caffemodel"
 
+# -------------------------------------------------------------
+# Data classes
+# -------------------------------------------------------------
 @dataclass
 class DetectionResult:
-    """Represents a detected face bounding box."""
-
     x: int
     y: int
     w: int
@@ -58,46 +60,25 @@ class DetectionResult:
 
 
 def ensure_results_dir(directory: Path) -> Path:
-    """Create the results directory if it does not exist."""
-
     directory.mkdir(parents=True, exist_ok=True)
     return directory
 
-
-# ------------------------------------------------------------------------------------
-# Face detection backends
-# ------------------------------------------------------------------------------------
-
-
-def get_haar_cascade() -> cv2.CascadeClassifier:
-    """Load the Haar Cascade classifier shipped with OpenCV."""
-
-    cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-    cascade = cv2.CascadeClassifier(cascade_path)
+# -------------------------------------------------------------
+# Haar Detector
+# -------------------------------------------------------------
+def get_haar_cascade():
+    path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+    cascade = cv2.CascadeClassifier(path)
     if cascade.empty():
-        raise FileNotFoundError(
-            "Could not load Haar Cascade classifier. Ensure OpenCV is installed correctly."
-        )
+        raise RuntimeError("Could not load Haar Cascade.")
     return cascade
 
 
-def detect_faces_haar(
-    image: np.ndarray,
-    scale_factor: float = 1.3,
-    min_neighbors: int = 5,
-    min_size: Tuple[int, int] = (30, 30),
-) -> List[DetectionResult]:
-    """Detect faces using OpenCV's Haar Cascade classifier."""
-
+def detect_faces_haar(image: np.ndarray) -> List[DetectionResult]:
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     cascade = get_haar_cascade()
-    faces = cascade.detectMultiScale(
-        gray,
-        scaleFactor=scale_factor,
-        minNeighbors=min_neighbors,
-        minSize=min_size,
-        flags=cv2.CASCADE_SCALE_IMAGE,
-    )
+    faces = cascade.detectMultiScale(gray, 1.3, 5)
+
     return [DetectionResult(x, y, w, h) for (x, y, w, h) in faces]
 
 
@@ -220,53 +201,77 @@ def detect_faces_dnn(
         width, height = max(0, end_x - x), max(0, end_y - y)
         results.append(DetectionResult(x, y, width, height, confidence))
     return results
+# -------------------------------------------------------------
+# DNN Detector
+# -------------------------------------------------------------
+_dnn_net: Optional[cv2.dnn_Net] = None
+
+def get_dnn_detector(proto_path: Path, weights_path: Path) -> cv2.dnn_Net:
+    global _dnn_net
+    if _dnn_net is None:
+        _dnn_net = cv2.dnn.readNetFromCaffe(str(proto_path), str(weights_path))
+    return _dnn_net
 
 
-# ------------------------------------------------------------------------------------
-# Privacy-preserving transformations
-# ------------------------------------------------------------------------------------
-
-
-def _sanitize_kernel_size(value: int) -> int:
-    """Ensure the kernel size is an odd integer >= 1."""
-
-    value = max(1, value)
-    return value + 1 if value % 2 == 0 else value
-
-
-def apply_gaussian_blur(
+def detect_faces_dnn(
     image: np.ndarray,
-    detections: Sequence[DetectionResult],
-    blur_ratio: float = 0.15,
-) -> np.ndarray:
-    """Apply Gaussian blur to detected faces."""
+    proto_path: Path,
+    weights_path: Path,
+    confidence_threshold: float = 0.5
+) -> List[DetectionResult]:
 
+    net = get_dnn_detector(proto_path, weights_path)
+
+    (h, w) = image.shape[:2]
+    blob = cv2.dnn.blobFromImage(
+        cv2.resize(image, (300, 300)),
+        scalefactor=1.0,
+        size=(300, 300),
+        mean=(104.0, 177.0, 123.0),
+    )
+    net.setInput(blob)
+    detections = net.forward()
+
+    results = []
+    for i in range(detections.shape[2]):
+        confidence = float(detections[0, 0, i, 2])
+        if confidence < confidence_threshold:
+            continue
+
+        box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
+        start_x, start_y, end_x, end_y = box.astype("int")
+
+        x = max(0, start_x)
+        y = max(0, start_y)
+        width = max(0, end_x - x)
+        height = max(0, end_y - y)
+
+        results.append(DetectionResult(x, y, width, height, confidence))
+
+    return results
+
+
+# -------------------------------------------------------------
+# Privacy Effects
+# -------------------------------------------------------------
+def apply_gaussian_blur(image, detections):
     result = image.copy()
     for det in detections:
         x, y, w, h = det.rect
-        face_roi = result[y : y + h, x : x + w]
-        if face_roi.size == 0:
+        roi = result[y:y+h, x:x+w]
+        if roi.size == 0:
             continue
-        # Kernel is proportional to face size for adaptive blur strength.
-        kernel_w = _sanitize_kernel_size(int(w * blur_ratio))
-        kernel_h = _sanitize_kernel_size(int(h * blur_ratio))
-        blurred_face = cv2.GaussianBlur(face_roi, (kernel_w, kernel_h), 0)
-        result[y : y + h, x : x + w] = blurred_face
+        blurred = cv2.GaussianBlur(roi, (31, 31), 0)
+        result[y:y+h, x:x+w] = blurred
     return result
 
 
-def apply_pixelation(
-    image: np.ndarray,
-    detections: Sequence[DetectionResult],
-    downscale_ratio: float = 0.1,
-) -> np.ndarray:
-    """Apply pixelation effect to detected faces."""
-
+def apply_pixelation(image, detections):
     result = image.copy()
     for det in detections:
         x, y, w, h = det.rect
-        face_roi = result[y : y + h, x : x + w]
-        if face_roi.size == 0:
+        roi = result[y:y+h, x:x+w]
+        if roi.size == 0:
             continue
         # Downscale and upscale to create pixelation.
         new_w = max(1, int(w * downscale_ratio))
@@ -306,13 +311,11 @@ def select_detector(
         raise ValueError(f"Unsupported detector '{name}'. Choose from {list(detectors)}")
     return detectors[name]
 
+        small = cv2.resize(roi, (16, 16), interpolation=cv2.INTER_LINEAR)
+        pixelated = cv2.resize(small, (w, h), interpolation=cv2.INTER_NEAREST)
+        result[y:y+h, x:x+w] = pixelated
+    return result
 
-def annotate_detections(
-    image: np.ndarray,
-    detections: Sequence[DetectionResult],
-    color: Tuple[int, int, int] = (0, 255, 0),
-) -> np.ndarray:
-    """Draw bounding boxes and optional confidence scores for visualization."""
 
     annotated = image.copy()
     for det in detections:
@@ -359,45 +362,38 @@ def process_single_image(
         dnn_confidence=dnn_confidence,
     )
     detections = detector(image)
+# -------------------------------------------------------------
+# Unified detector selector
+# -------------------------------------------------------------
+def select_detector(name: str, proto, weights) -> Callable:
+    if name == "haar":
+        return detect_faces_haar
+    if name == "dnn":
+        return lambda img: detect_faces_dnn(img, proto, weights)
+    raise ValueError("Unknown detector: " + name)
+
+
+# -------------------------------------------------------------
+# Image processing
+# -------------------------------------------------------------
+def process_single_image(image_path, output_dir, mode, detector_name, proto, weights):
+    img = cv2.imread(str(image_path))
+    if img is None:
+        print(f"[ERROR] Unable to load {image_path}")
+        return None
+
+    detector = select_detector(detector_name, proto, weights)
+    detections = detector(img)
 
     if mode == "blur":
-        processed = apply_gaussian_blur(image, detections)
-    elif mode == "pixelate":
-        processed = apply_pixelation(image, detections)
+        processed = apply_gaussian_blur(img, detections)
     else:
-        raise ValueError("mode must be 'blur' or 'pixelate'")
-
-    annotated = annotate_detections(image, detections)
+        processed = apply_pixelation(img, detections)
 
     output_path = output_dir / f"{image_path.stem}_{mode}_{detector_name}{image_path.suffix}"
     cv2.imwrite(str(output_path), processed)
 
-    if show:
-        # Display side-by-side comparison using matplotlib.
-        rgb_original = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        rgb_processed = cv2.cvtColor(processed, cv2.COLOR_BGR2RGB)
-        rgb_annotated = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
-        plt.figure(figsize=(12, 4))
-        plt.subplot(1, 3, 1)
-        plt.imshow(rgb_original)
-        plt.title("Original")
-        plt.axis("off")
-
-        plt.subplot(1, 3, 2)
-        plt.imshow(rgb_processed)
-        plt.title(f"{mode.capitalize()}ed")
-        plt.axis("off")
-
-        plt.subplot(1, 3, 3)
-        plt.imshow(rgb_annotated)
-        plt.title("Detections")
-        plt.axis("off")
-        plt.tight_layout()
-        plt.show()
-
-    print(
-        f"[INFO] Processed {image_path.name}: {len(detections)} face(s) detected using {detector_name}."
-    )
+    print(f"[INFO] Saved → {output_path}")
     return output_path
 
 
@@ -603,9 +599,21 @@ def parse_arguments(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_arguments(argv)
-    results_dir = ensure_results_dir(args.results_dir)
+# -------------------------------------------------------------
+# CLI
+# -------------------------------------------------------------
+def parse_arguments():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--image", type=Path)
+    parser.add_argument("--mode", default="blur", choices=["blur", "pixelate"])
+    parser.add_argument("--detector", default="dnn", choices=["haar", "dnn"])
+    parser.add_argument("--results-dir", type=Path, default=Path("results"))
+    return parser.parse_args()
 
-    processed_paths: List[Path] = []
+
+def main():
+    args = parse_arguments()
+    results_dir = ensure_results_dir(args.results_dir)
 
     if args.image:
         if not args.image.exists():
@@ -672,6 +680,15 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "  • Inspect qualitative differences between Gaussian blur and pixelation for privacy needs.\n"
         "  • Experiment with detection parameters (scale factor, min neighbors, confidence thresholds) to balance accuracy vs speed.\n"
     )
+
+        process_single_image(
+            args.image,
+            results_dir,
+            args.mode,
+            args.detector,
+            DEFAULT_DNN_PROTO,
+            DEFAULT_DNN_WEIGHTS,
+        )
 
     return 0
 
