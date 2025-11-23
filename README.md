@@ -33,6 +33,8 @@ curl -L -o models/res10_300x300_ssd_iter_140000_fp16.caffemodel \
 # Alternate mirror if the main link is unavailable:
 # curl -L -o models/res10_300x300_ssd_iter_140000_fp16.caffemodel \
 #   https://github.com/spmallick/learnopencv/raw/master/FaceDetectionComparison/models/res10_300x300_ssd_iter_140000_fp16.caffemodel
+  https://raw.githubusercontent.com/opencv/opencv_3rdparty/dnn_samples_face_detector_20170830/res10_300x300_ssd_iter_140000_fp16.caffemodel
+  https://raw.githubusercontent.com/opencv/opencv_3rdparty/master/dnn_samples/face_detector/res10_300x300_ssd_iter_140000_fp16.caffemodel
 ```
 
 You can also point to custom models via `--dnn-prototxt` and `--dnn-weights`.
@@ -40,6 +42,7 @@ You can also point to custom models via `--dnn-prototxt` and `--dnn-weights`.
 If the automatic download fails (for example, due to a moved URL), update the paths with your own files or re-run the above
 commands with a working link. The script now tries multiple URLs (and gracefully handles nested URL lists) before prompting
 for manual download.
+commands with a working link. The script now tries multiple official OpenCV URLs before prompting for manual download.
 
 ## Usage examples
 Process a single image with the default DNN detector and blur effect:
