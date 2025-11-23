@@ -24,6 +24,17 @@ DEFAULT_MODELS_DIR = Path("models")
 DEFAULT_DNN_PROTO = DEFAULT_MODELS_DIR / "deploy.prototxt"
 DEFAULT_DNN_WEIGHTS = DEFAULT_MODELS_DIR / "res10_300x300_ssd_iter_140000_fp16.caffemodel"
 
+DNN_PROTO_URLS: Sequence[str] = (
+    "https://raw.githubusercontent.com/opencv/opencv/master/samples/dnn/face_detector/deploy.prototxt",
+)
+
+DNN_WEIGHTS_URLS: Sequence[str] = (
+    "https://raw.githubusercontent.com/opencv/opencv_3rdparty/dnn_samples_face_detector_20170830/"
+    "res10_300x300_ssd_iter_140000_fp16.caffemodel",
+    "https://raw.githubusercontent.com/opencv/opencv_3rdparty/master/dnn_samples/face_detector/"
+    "res10_300x300_ssd_iter_140000_fp16.caffemodel",
+)
+
 # ------------------------------------------------------------------------------------
 # Data containers and utility helpers
 # ------------------------------------------------------------------------------------
@@ -91,6 +102,26 @@ def detect_faces_haar(
 _dnn_net: Optional[cv2.dnn_Net] = None
 
 
+def _download_file(urls: Sequence[str], destination: Path) -> None:
+    """Download a file from one of the given URLs to the destination path."""
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    errors = []
+    for url in urls:
+        try:
+            print(f"[INFO] Downloading {destination.name} from {url}")
+            urllib.request.urlretrieve(url, destination)
+            return
+        except Exception as exc:  # pylint: disable=broad-exception-caught
+            errors.append((url, exc))
+            print(f"[WARN] Failed to download from {url}: {exc}")
+
+    attempted = "\n".join([f"- {url}: {err}" for url, err in errors])
+    raise RuntimeError(
+        "Could not download required DNN model files.\n"
+        "Please download them manually or provide existing paths via --dnn-prototxt/--dnn-weights.\n"
+        f"Attempted URLs:\n{attempted}"
+    )
 def _download_file(url: str, destination: Path) -> None:
     """Download a file from a URL to the destination path."""
 
@@ -102,6 +133,10 @@ def _download_file(url: str, destination: Path) -> None:
 def ensure_dnn_model_files(proto_path: Path, weights_path: Path) -> None:
     """Download the OpenCV DNN face detector model files if missing."""
 
+    if not proto_path.exists():
+        _download_file(DNN_PROTO_URLS, proto_path)
+    if not weights_path.exists():
+        _download_file(DNN_WEIGHTS_URLS, weights_path)
     proto_url = (
         "https://raw.githubusercontent.com/opencv/opencv/master/samples/dnn/face_detector/"
         "deploy.prototxt"
