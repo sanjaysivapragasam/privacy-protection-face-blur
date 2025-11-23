@@ -34,6 +34,12 @@ DNN_WEIGHTS_URLS: Sequence[str] = (
     "https://raw.githubusercontent.com/opencv/opencv_3rdparty/55e8c46fcfa66c96b6f4050af3e60c8e2f8b7631/"
     "dnn_samples/face_detector/res10_300x300_ssd_iter_140000_fp16.caffemodel",
     "https://github.com/spmallick/learnopencv/raw/master/FaceDetectionComparison/models/"
+    "https://github.com/opencv/opencv/raw/4.x/samples/dnn/face_detector/"
+    "res10_300x300_ssd_iter_140000_fp16.caffemodel",
+    "https://github.com/spmallick/learnopencv/raw/master/FaceDetectionComparison/models/"
+    "https://raw.githubusercontent.com/opencv/opencv_3rdparty/dnn_samples_face_detector_20170830/"
+    "res10_300x300_ssd_iter_140000_fp16.caffemodel",
+    "https://raw.githubusercontent.com/opencv/opencv_3rdparty/master/dnn_samples/face_detector/"
     "res10_300x300_ssd_iter_140000_fp16.caffemodel",
 )
 
@@ -122,6 +128,7 @@ def _download_file(urls: Sequence[str], destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     errors = []
     for url in _normalize_urls(urls):
+    for url in urls:
         try:
             print(f"[INFO] Downloading {destination.name} from {url}")
             urllib.request.urlretrieve(url, destination)
@@ -136,6 +143,12 @@ def _download_file(urls: Sequence[str], destination: Path) -> None:
         "Please download them manually or provide existing paths via --dnn-prototxt/--dnn-weights.\n"
         f"Attempted URLs:\n{attempted}"
     )
+def _download_file(url: str, destination: Path) -> None:
+    """Download a file from a URL to the destination path."""
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    print(f"[INFO] Downloading {destination.name} from {url}")
+    urllib.request.urlretrieve(url, destination)
 
 
 def ensure_dnn_model_files(proto_path: Path, weights_path: Path) -> None:
@@ -145,6 +158,19 @@ def ensure_dnn_model_files(proto_path: Path, weights_path: Path) -> None:
         _download_file(DNN_PROTO_URLS, proto_path)
     if not weights_path.exists():
         _download_file(DNN_WEIGHTS_URLS, weights_path)
+    proto_url = (
+        "https://raw.githubusercontent.com/opencv/opencv/master/samples/dnn/face_detector/"
+        "deploy.prototxt"
+    )
+    weights_url = (
+        "https://raw.githubusercontent.com/opencv/opencv_3rdparty/master/"
+        "dnn_samples/face_detector/res10_300x300_ssd_iter_140000_fp16.caffemodel"
+    )
+
+    if not proto_path.exists():
+        _download_file(proto_url, proto_path)
+    if not weights_path.exists():
+        _download_file(weights_url, weights_path)
 
 
 def get_dnn_detector(proto_path: Path, weights_path: Path) -> cv2.dnn_Net:
