@@ -22,6 +22,7 @@ The DNN detector uses two files:
 - `models/deploy.prototxt`
 - `models/res10_300x300_ssd_iter_140000_fp16.caffemodel`
 
+If these files are missing, the script can automatically download them from the official OpenCV repositories into the `models/` folder (unless you pass `--no-download`). To install them manually, download the files to the same paths:
 If these files are missing, the script automatically downloads them from the official OpenCV repositories into the `models/` folder. To install them manually, download the files to the same paths:
 
 ```bash
@@ -45,6 +46,7 @@ curl -L -o models/res10_300x300_ssd_iter_140000_fp16.caffemodel \
 
 You can also point to custom models via `--dnn-prototxt` and `--dnn-weights`.
 
+If the automatic download fails (for example, due to a moved URL) or you are running offline with `--no-download`, update the paths with your own files or re-run the above commands with a working link. The script now tries multiple URLs (and gracefully handles nested URL lists) before prompting for manual download.
 If the automatic download fails (for example, due to a moved URL), update the paths with your own files or re-run the above
 commands with a working link. The script now tries multiple URLs (and gracefully handles nested URL lists) before prompting
 for manual download.
@@ -75,6 +77,7 @@ python main.py --video input.mp4 --detector haar --no-display --save-video
 - Use Haar cascade instead: `--detector haar`
 - Show Matplotlib previews for images: `--show`
 - Disable the live OpenCV window during video processing: `--no-display`
+- Force offline/local models only (no auto-download): `--no-download`
 - Choose output directory: `--results-dir path/to/results`
 
 ## Adding new detectors or packages
