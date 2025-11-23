@@ -30,6 +30,7 @@ curl -L -o models/deploy.prototxt \
   https://raw.githubusercontent.com/opencv/opencv/master/samples/dnn/face_detector/deploy.prototxt
 curl -L -o models/res10_300x300_ssd_iter_140000_fp16.caffemodel \
   https://raw.githubusercontent.com/opencv/opencv_3rdparty/dnn_samples_face_detector_20170830/res10_300x300_ssd_iter_140000_fp16.caffemodel
+  https://raw.githubusercontent.com/opencv/opencv_3rdparty/master/dnn_samples/face_detector/res10_300x300_ssd_iter_140000_fp16.caffemodel
 ```
 
 You can also point to custom models via `--dnn-prototxt` and `--dnn-weights`.
