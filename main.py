@@ -29,6 +29,11 @@ DNN_PROTO_URLS: Sequence[str] = (
 )
 
 DNN_WEIGHTS_URLS: Sequence[str] = (
+    "https://raw.githubusercontent.com/opencv/opencv/4.x/samples/dnn/face_detector/"
+    "res10_300x300_ssd_iter_140000_fp16.caffemodel",
+    "https://raw.githubusercontent.com/opencv/opencv_3rdparty/55e8c46fcfa66c96b6f4050af3e60c8e2f8b7631/"
+    "dnn_samples/face_detector/res10_300x300_ssd_iter_140000_fp16.caffemodel",
+    "https://github.com/spmallick/learnopencv/raw/master/FaceDetectionComparison/models/"
     "https://github.com/opencv/opencv/raw/4.x/samples/dnn/face_detector/"
     "res10_300x300_ssd_iter_140000_fp16.caffemodel",
     "https://github.com/spmallick/learnopencv/raw/master/FaceDetectionComparison/models/"
